@@ -38,9 +38,28 @@
         <li
           v-for="option in filteredOptions"
           :key="option.value"
-          @click="selectOption(option)"
-          class="p-3 hover:bg-blue-100 cursor-pointer">
-          {{ option.label }}
+          @click="isOptionSelected(option) ? null : selectOption(option)"
+          class="p-3 hover:bg-blue-100 cursor-pointer"
+          :class="{
+            'text-blue-500 font-semibold': isOptionSelected(option),
+            'hover:bg-blue-100': !isOptionSelected(option),
+          }">
+          <div class="flex items-center justify-between">
+            {{ option.label }}
+            <svg
+              v-if="isOptionSelected(option)"
+              class="w-4 h-4 text-green-500"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"></path>
+            </svg>
+          </div>
         </li>
         <li
           v-if="filteredOptions.length === 0"
@@ -87,6 +106,10 @@ const filteredOptions = computed(() =>
   )
 );
 
+const isOptionSelected = (option: Option): boolean => {
+  return selectedOption.value?.value === option.value;
+};
+
 const toggleDropdown = () => {
   isOpen.value = !isOpen.value;
 
@@ -102,10 +125,12 @@ const closeDropdown = () => {
 };
 
 const selectOption = (option: Option) => {
-  selectedOption.value = option;
-  closeDropdown();
-  searchQuery.value = "";
-  emit("update:modelValue", option.value);
+  if (!isOptionSelected(option)) {
+    selectedOption.value = option;
+    closeDropdown();
+    searchQuery.value = "";
+    emit("update:modelValue", option.value);
+  }
 };
 
 const handleClickOutside = (event: MouseEvent) => {

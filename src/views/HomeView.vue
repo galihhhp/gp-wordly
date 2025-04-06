@@ -32,24 +32,23 @@
 
     <div v-else class="flex flex-col md:flex-row gap-6">
       <div class="flex-1">
-        <div
+        <ErrorMessage
           v-if="countryDetailsError"
-          class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md mb-4">
-          <p>Error loading country details: {{ countryDetailsError }}</p>
-        </div>
+          :message="countryDetailsError" />
         <CountryDetails v-else-if="countryDetails" :country="countryDetails" />
       </div>
 
       <div class="w-full md:w-1/4">
-        <div
-          v-if="newsError"
-          class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md mb-4">
-          <p>Error loading news: {{ newsError }}</p>
-        </div>
+        <ErrorMessage v-if="newsError" :message="newsError" />
         <NewsList
           v-else-if="newsArticles.length"
           :articles="newsArticles"
           :countryName="countryDetails?.name.common || ''" />
+        <div
+          v-else-if="!newsLoading && countryDetails"
+          class="bg-gray-100 p-4 rounded shadow-md">
+          <p>No news articles found for {{ countryDetails.name.common }}</p>
+        </div>
       </div>
     </div>
   </div>
@@ -63,11 +62,13 @@ import NewsList from "@/components/NewsList.vue";
 import Select from "@/components/Select.vue";
 import CountryMap from "@/components/CountryMap.vue";
 import type { Country, NewsArticle } from "@/types";
+import ErrorMessage from "@/components/ErrorMessage.vue";
 
 const countries = ref<Country[]>([]);
 const selectedCountry = ref<string>("");
 const countryDetails = ref<Country | null>(null);
 const newsArticles = ref<NewsArticle[]>([]);
+const lastNewsUrl = ref<string | null>(null);
 
 const {
   data: countriesData,
@@ -106,20 +107,24 @@ watch(
 const handleCountrySelect = async (countryCode: string) => {
   selectedCountry.value = countryCode;
 
-  const countryUrl = `https://restcountries.com/v3.1/alpha/${selectedCountry}`;
-  fetchCountryDetails(countryUrl);
+  const countryUrl = `https://restcountries.com/v3.1/alpha/${selectedCountry.value}`;
+  await fetchCountryDetails(countryUrl);
 
   newsArticles.value = [];
 
-  const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${selectedCountry}&apiKey=${
-    import.meta.env.VITE_NEWS_API_KEY
-  }`;
+  const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${
+    selectedCountry.value
+  }&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+
+  lastNewsUrl.value = newsUrl;
   await fetchNews(newsUrl);
 
   if (!newsArticles.value.length && countryDetails.value) {
     const fallbackNewsUrl = `https://newsapi.org/v2/everything?page=1&pageSize=10&searchIn=title&q=${encodeURIComponent(
       countryDetails.value.name.common
     )}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+
+    lastNewsUrl.value = fallbackNewsUrl;
     await fetchNews(fallbackNewsUrl);
   }
 };
