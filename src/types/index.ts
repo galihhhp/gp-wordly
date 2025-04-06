@@ -17,6 +17,11 @@ export interface Country {
   unMember: boolean;
   car?: { side: string };
   tld?: string[];
+  latlng: number[];
+  flags?: {
+    png: string;
+    svg: string;
+  };
 }
 
 export interface NewsArticle {

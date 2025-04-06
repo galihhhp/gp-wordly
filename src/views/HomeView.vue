@@ -1,9 +1,12 @@
 <template>
   <div class="min-h-screen p-4 container mx-auto">
     <div
+      v-if="!countryDetails"
       class="h-96 bg-red-400 text-white font-bold text-2xl rounded-2xl flex items-center justify-center mb-8">
-      {{ countryDetails?.name.common || "Select a Country" }}
+      Select a Country
     </div>
+
+    <CountryMap v-else :country="countryDetails" class="mb-8" />
 
     <div class="mb-6">
       <label
@@ -27,19 +30,24 @@
       <div class="loader"></div>
     </div>
 
-    <div
-      v-else-if="countriesError || countryDetailsError || newsError"
-      class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md">
-      <p>{{ countriesError || countryDetailsError || newsError }}</p>
-    </div>
-
     <div v-else class="flex flex-col md:flex-row gap-6">
       <div class="flex-1">
-        <CountryDetails v-if="countryDetails" :country="countryDetails" />
+        <div
+          v-if="countryDetailsError"
+          class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md mb-4">
+          <p>Error loading country details: {{ countryDetailsError }}</p>
+        </div>
+        <CountryDetails v-else-if="countryDetails" :country="countryDetails" />
       </div>
 
-      <div class="w-full md:w-1/4" v-if="newsArticles.length">
+      <div class="w-full md:w-1/4">
+        <div
+          v-if="newsError"
+          class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-md mb-4">
+          <p>Error loading news: {{ newsError }}</p>
+        </div>
         <NewsList
+          v-else-if="newsArticles.length"
           :articles="newsArticles"
           :countryName="countryDetails?.name.common || ''" />
       </div>
@@ -53,7 +61,7 @@ import { useFetch } from "@/utils/useFetch";
 import CountryDetails from "@/components/CountryDetails.vue";
 import NewsList from "@/components/NewsList.vue";
 import Select from "@/components/Select.vue";
-
+import CountryMap from "@/components/CountryMap.vue";
 import type { Country, NewsArticle } from "@/types";
 
 const countries = ref<Country[]>([]);
@@ -98,12 +106,12 @@ watch(
 const handleCountrySelect = async (countryCode: string) => {
   selectedCountry.value = countryCode;
 
-  const countryUrl = `https://restcountries.com/v3.1/alpha/${countryCode}`;
+  const countryUrl = `https://restcountries.com/v3.1/alpha/${selectedCountry}`;
   fetchCountryDetails(countryUrl);
 
   newsArticles.value = [];
 
-  const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${countryCode}&apiKey=${
+  const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${selectedCountry}&apiKey=${
     import.meta.env.VITE_NEWS_API_KEY
   }`;
   await fetchNews(newsUrl);
@@ -119,7 +127,9 @@ const handleCountrySelect = async (countryCode: string) => {
 watch(
   () => countryDetailsData.value,
   (newData) => {
-    if (newData && Array.isArray(newData)) countryDetails.value = newData[0];
+    if (newData && Array.isArray(newData)) {
+      countryDetails.value = newData[0];
+    }
   }
 );
 
