@@ -22,6 +22,9 @@ export interface Country {
     png: string;
     svg: string;
   };
+  capitalInfo?: {
+    latlng?: number[];
+  };
 }
 
 export interface NewsArticle {

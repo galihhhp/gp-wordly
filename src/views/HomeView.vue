@@ -11,46 +11,58 @@
     <div class="mb-6">
       <label
         for="country-select"
-        class="block text-lg font-medium mb-2 text-gray-700">
-        Select a Country:
+        class="block font-semibold mb-2 text-gray-700">
+        Country:
       </label>
       <Select
         :options="countryOptions"
         placeholder="Select a country"
         @update:modelValue="
           async (value) => {
+            isLoading = true;
             await handleCountrySelect(value as string);
+            isLoading = false;
           }
         " />
     </div>
 
-    <div
-      v-if="countriesLoading || countryDetailsLoading || newsLoading"
-      class="flex justify-center py-12">
+    <div v-if="isLoading" class="flex justify-center py-12">
       <div class="loader"></div>
     </div>
 
-    <div v-else class="flex flex-col md:flex-row gap-6">
-      <div class="flex-1">
-        <ErrorMessage
-          v-if="countryDetailsError"
-          :message="countryDetailsError" />
-        <CountryDetails v-else-if="countryDetails" :country="countryDetails" />
+    <template v-else>
+      <div v-if="countryDetails" class="mb-8">
+        <WeatherForecast
+          :forecast="weatherForecast"
+          :loading="false"
+          :error="weatherError"
+          :locationName="countryDetails.name.common" />
       </div>
 
-      <div class="w-full md:w-1/4">
-        <ErrorMessage v-if="newsError" :message="newsError" />
-        <NewsList
-          v-else-if="newsArticles.length"
-          :articles="newsArticles"
-          :countryName="countryDetails?.name.common || ''" />
-        <div
-          v-else-if="!newsLoading && countryDetails"
-          class="bg-gray-100 p-4 rounded shadow-md">
-          <p>No news articles found for {{ countryDetails.name.common }}</p>
+      <div class="flex flex-col md:flex-row gap-6">
+        <div class="flex-1">
+          <ErrorMessage
+            v-if="countryDetailsError"
+            :message="countryDetailsError" />
+          <CountryDetails
+            v-else-if="countryDetails"
+            :country="countryDetails" />
+        </div>
+
+        <div class="w-full md:w-1/4">
+          <ErrorMessage v-if="newsError" :message="newsError" />
+          <NewsList
+            v-else-if="newsArticles.length"
+            :articles="newsArticles"
+            :countryName="countryDetails?.name.common || ''" />
+          <div
+            v-else-if="countryDetails"
+            class="bg-gray-100 p-4 rounded shadow-md">
+            <p>No news articles found for {{ countryDetails.name.common }}</p>
+          </div>
         </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
@@ -61,14 +73,20 @@ import CountryDetails from "@/components/CountryDetails.vue";
 import NewsList from "@/components/NewsList.vue";
 import Select from "@/components/Select.vue";
 import CountryMap from "@/components/CountryMap.vue";
+import WeatherForecast from "@/components/WeatherForecast.vue";
 import type { Country, NewsArticle } from "@/types";
 import ErrorMessage from "@/components/ErrorMessage.vue";
+
+const isLoading = ref<boolean>(false);
 
 const countries = ref<Country[]>([]);
 const selectedCountry = ref<string>("");
 const countryDetails = ref<Country | null>(null);
 const newsArticles = ref<NewsArticle[]>([]);
 const lastNewsUrl = ref<string | null>(null);
+
+const weatherForecast = ref<any>(null);
+const weatherError = ref<string | null>(null);
 
 const {
   data: countriesData,
@@ -90,6 +108,18 @@ const {
   fetchData: fetchNews,
 } = useFetch<{ articles: NewsArticle[] }>(null);
 
+watch(
+  countriesLoading,
+  (loading) => {
+    if (loading) {
+      isLoading.value = true;
+    } else {
+      isLoading.value = false;
+    }
+  },
+  { immediate: true }
+);
+
 const countryOptions = computed(() =>
   countries.value.map((country) => ({
     value: country.cca3,
@@ -97,44 +127,90 @@ const countryOptions = computed(() =>
   }))
 );
 
-watch(
-  () => countriesData.value,
-  (newData) => {
-    if (newData) countries.value = newData;
+const fetchWeatherData = async (country: Country) => {
+  if (!country.latlng || country.latlng.length < 2) {
+    weatherError.value = "Location coordinates not available for this country";
+    weatherForecast.value = null;
+    return;
   }
-);
+
+  weatherError.value = null;
+
+  try {
+    const today = new Date();
+    const sevenDaysLater = new Date();
+    sevenDaysLater.setDate(today.getDate() + 6);
+
+    const formatDate = (date: Date) => {
+      return date.toISOString().split("T")[0];
+    };
+
+    let latitude = country.latlng[0];
+    let longitude = country.latlng[1];
+
+    if (country.capitalInfo?.latlng?.length === 2) {
+      latitude = country.capitalInfo.latlng[0];
+      longitude = country.capitalInfo.latlng[1];
+    }
+
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${formatDate(
+      today
+    )}&end_date=${formatDate(sevenDaysLater)}`;
+
+    const response = await fetch(weatherUrl);
+
+    if (!response.ok) {
+      throw new Error(`Weather API responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    weatherForecast.value = data;
+  } catch (error) {
+    console.error("Error fetching weather data:", error);
+    weatherError.value = `Failed to fetch weather data: ${
+      error instanceof Error ? error.message : "Unknown error"
+    }`;
+    weatherForecast.value = null;
+  }
+};
 
 const handleCountrySelect = async (countryCode: string) => {
   selectedCountry.value = countryCode;
 
+  weatherForecast.value = null;
+  weatherError.value = null;
+  newsArticles.value = [];
+
   const countryUrl = `https://restcountries.com/v3.1/alpha/${selectedCountry.value}`;
   await fetchCountryDetails(countryUrl);
 
-  newsArticles.value = [];
+  if (countryDetailsData.value && Array.isArray(countryDetailsData.value)) {
+    countryDetails.value = countryDetailsData.value[0];
 
-  const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${
-    selectedCountry.value
-  }&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+    await fetchWeatherData(countryDetails.value as Country);
 
-  lastNewsUrl.value = newsUrl;
-  await fetchNews(newsUrl);
+    const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${
+      selectedCountry.value
+    }&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
 
-  if (!newsArticles.value.length && countryDetails.value) {
-    const fallbackNewsUrl = `https://newsapi.org/v2/everything?page=1&pageSize=10&searchIn=title&q=${encodeURIComponent(
-      countryDetails.value.name.common
-    )}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+    lastNewsUrl.value = newsUrl;
+    await fetchNews(newsUrl);
 
-    lastNewsUrl.value = fallbackNewsUrl;
-    await fetchNews(fallbackNewsUrl);
+    if (!newsData.value?.articles.length) {
+      const fallbackNewsUrl = `https://newsapi.org/v2/everything?page=1&pageSize=10&searchIn=title&q=${encodeURIComponent(
+        countryDetails.value?.name.common || "country"
+      )}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+
+      lastNewsUrl.value = fallbackNewsUrl;
+      await fetchNews(fallbackNewsUrl);
+    }
   }
 };
 
 watch(
-  () => countryDetailsData.value,
+  () => countriesData.value,
   (newData) => {
-    if (newData && Array.isArray(newData)) {
-      countryDetails.value = newData[0];
-    }
+    if (newData) countries.value = newData;
   }
 );
 
