@@ -6,14 +6,19 @@
     <ul class="space-y-4">
       <li
         v-for="article in articles"
-        :key="article.url"
+        :key="article.webUrl"
         class="p-4 rounded-xl border-2">
-        <a :href="article.url" target="_blank" class="block h-full w-full">
+        <a :href="article.webUrl" target="_blank" class="block h-full w-full">
           <div>
             <h4 class="font-semibold hover:underline text-xl">
-              {{ article.title }}
+              {{ article.webTitle }}
             </h4>
-            <p class="text-gray-600 mt-2">{{ article.description }}</p>
+            <p class="text-gray-600 mt-2">{{ article.fields?.trailText }}</p>
+            <div
+              class="flex justify-between items-center mt-3 text-sm text-gray-500">
+              <span>{{ formatDate(article.webPublicationDate) }}</span>
+              <span>The Guardian</span>
+            </div>
           </div>
         </a>
       </li>
@@ -25,11 +30,11 @@
 </template>
 
 <script setup lang="ts">
-import type { NewsArticle } from "@/types";
+import type { GuardianArticle } from "@/types";
 
 defineProps({
   articles: {
-    type: Array as () => NewsArticle[],
+    type: Array as () => GuardianArticle[],
     required: true,
   },
   countryName: {
@@ -37,4 +42,13 @@ defineProps({
     required: true,
   },
 });
+
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
 </script>

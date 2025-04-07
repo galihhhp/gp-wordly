@@ -1,14 +1,14 @@
 <template>
   <div class="relative" ref="selectWrapper">
     <div
-      class="border border-gray-300 rounded-md p-2 bg-white text-gray-800 cursor-pointer flex justify-between items-center"
+      class="border-2 rounded-md p-2 bg-white text-gray-800 cursor-pointer flex justify-between items-center"
       @click="toggleDropdown"
       @keydown.escape="closeDropdown"
       tabindex="0">
       <span>{{ selectedOption?.label || placeholder }}</span>
 
       <svg
-        class="w-4 h-4 text-gray-500 transition-transform duration-200"
+        class="w-4 h-4 text-black transition-transform duration-200"
         :class="{ 'transform rotate-180': isOpen }"
         fill="none"
         stroke="currentColor"
@@ -24,7 +24,7 @@
 
     <div
       v-if="isOpen"
-      class="absolute z-10 mt-2 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-64 overflow-y-auto custom-scrollbar">
+      class="absolute z-10 mt-2 w-full bg-white border-2 rounded-md shadow-lg max-h-64 overflow-y-auto custom-scrollbar">
       <div class="p-2 border-b border-gray-200">
         <input
           ref="searchInput"
@@ -39,10 +39,9 @@
           v-for="option in filteredOptions"
           :key="option.value"
           @click="isOptionSelected(option) ? null : selectOption(option)"
-          class="p-3 hover:bg-blue-100 cursor-pointer"
+          class="p-3 cursor-pointer hover:bg-black hover:text-white transition-colors duration-200"
           :class="{
-            'text-blue-500 font-semibold': isOptionSelected(option),
-            'hover:bg-blue-100': !isOptionSelected(option),
+            'font-semibold': isOptionSelected(option),
           }">
           <div class="flex items-center justify-between">
             {{ option.label }}

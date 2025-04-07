@@ -39,6 +39,10 @@
           :locationName="countryDetails.name.common" />
       </div>
 
+      <div v-if="countryDetails" class="mb-8">
+        <LocalTimeDisplay :country="countryDetails" />
+      </div>
+
       <div class="flex flex-col md:flex-row gap-6">
         <div class="flex-1">
           <ErrorMessage
@@ -74,7 +78,8 @@ import NewsList from "@/components/NewsList.vue";
 import Select from "@/components/Select.vue";
 import CountryMap from "@/components/CountryMap.vue";
 import WeatherForecast from "@/components/WeatherForecast.vue";
-import type { Country, NewsArticle } from "@/types";
+import LocalTimeDisplay from "@/components/LocalTimeDisplay.vue";
+import type { Country, GuardianResponse, GuardianArticle } from "@/types";
 import ErrorMessage from "@/components/ErrorMessage.vue";
 
 const isLoading = ref<boolean>(false);
@@ -82,7 +87,7 @@ const isLoading = ref<boolean>(false);
 const countries = ref<Country[]>([]);
 const selectedCountry = ref<string>("");
 const countryDetails = ref<Country | null>(null);
-const newsArticles = ref<NewsArticle[]>([]);
+const newsArticles = ref<GuardianArticle[]>([]);
 const lastNewsUrl = ref<string | null>(null);
 
 const weatherForecast = ref<any>(null);
@@ -106,7 +111,7 @@ const {
   loading: newsLoading,
   error: newsError,
   fetchData: fetchNews,
-} = useFetch<{ articles: NewsArticle[] }>(null);
+} = useFetch<GuardianResponse>(null);
 
 watch(
   countriesLoading,
@@ -160,13 +165,12 @@ const fetchWeatherData = async (country: Country) => {
     const response = await fetch(weatherUrl);
 
     if (!response.ok) {
-      throw new Error(`Weather API responded with status: ${response.status}`);
+      throw new Error(response.status + ": " + response.statusText);
     }
 
     const data = await response.json();
     weatherForecast.value = data;
   } catch (error) {
-    console.error("Error fetching weather data:", error);
     weatherError.value = `Failed to fetch weather data: ${
       error instanceof Error ? error.message : "Unknown error"
     }`;
@@ -189,21 +193,15 @@ const handleCountrySelect = async (countryCode: string) => {
 
     await fetchWeatherData(countryDetails.value as Country);
 
-    const newsUrl = `https://newsapi.org/v2/top-headlines?page=1&pageSize=10&country=${
-      selectedCountry.value
-    }&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
+    const countryName = encodeURIComponent(
+      countryDetails.value?.name.common || ""
+    );
+    const guardianApiUrl = `https://content.guardianapis.com/search?q=${countryName}&page-size=10&show-fields=thumbnail,headline,trailText&api-key=${
+      import.meta.env.VITE_GUARDIAN_API_KEY
+    }`;
 
-    lastNewsUrl.value = newsUrl;
-    await fetchNews(newsUrl);
-
-    if (!newsData.value?.articles.length) {
-      const fallbackNewsUrl = `https://newsapi.org/v2/everything?page=1&pageSize=10&searchIn=title&q=${encodeURIComponent(
-        countryDetails.value?.name.common || "country"
-      )}&apiKey=${import.meta.env.VITE_NEWS_API_KEY}`;
-
-      lastNewsUrl.value = fallbackNewsUrl;
-      await fetchNews(fallbackNewsUrl);
-    }
+    lastNewsUrl.value = guardianApiUrl;
+    await fetchNews(guardianApiUrl);
   }
 };
 
@@ -217,7 +215,11 @@ watch(
 watch(
   () => newsData.value,
   (newData) => {
-    if (newData) newsArticles.value = newData.articles;
+    if (newData?.response?.results) {
+      newsArticles.value = newData.response.results;
+    } else {
+      newsArticles.value = [];
+    }
   }
 );
 </script>

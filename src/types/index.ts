@@ -27,8 +27,22 @@ export interface Country {
   };
 }
 
-export interface NewsArticle {
-  title: string;
-  description: string;
-  url: string;
+export interface GuardianArticle {
+  webTitle: string;
+  webUrl: string;
+  webPublicationDate: string;
+  fields?: {
+    thumbnail?: string;
+    headline?: string;
+    trailText?: string;
+  };
+}
+
+export interface GuardianResponse {
+  response: {
+    results: GuardianArticle[];
+    status: string;
+    total: number;
+    pages: number;
+  };
 }

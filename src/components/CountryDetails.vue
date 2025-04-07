@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-white rounded-lg">
+  <div class="bg-white rounded-xl border-2 p-4">
     <h2 class="text-2xl font-bold mb-4 text-gray-800">
       {{ country.name.common }}
     </h2>
