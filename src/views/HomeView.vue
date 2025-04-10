@@ -51,6 +51,10 @@
           <CountryDetails
             v-else-if="countryDetails"
             :country="countryDetails" />
+
+          <div v-if="countryDetails" class="mb-8">
+            <PhotoGallery :country="countryDetails" />
+          </div>
         </div>
 
         <div class="w-full md:w-1/4">
@@ -79,6 +83,7 @@ import Select from "@/components/Select.vue";
 import CountryMap from "@/components/CountryMap.vue";
 import WeatherForecast from "@/components/WeatherForecast.vue";
 import LocalTimeDisplay from "@/components/LocalTimeDisplay.vue";
+import PhotoGallery from "@/components/PhotoGallery.vue";
 import type { Country, GuardianResponse, GuardianArticle } from "@/types";
 import ErrorMessage from "@/components/ErrorMessage.vue";
 
