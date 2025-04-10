@@ -1,12 +1,12 @@
 <template>
   <div class="min-h-screen p-4 container mx-auto">
-    <div
-      v-if="!countryDetails"
-      class="h-96 bg-red-400 text-white font-bold text-2xl rounded-2xl flex items-center justify-center mb-8">
-      Select a Country
-    </div>
+    <Banner />
 
-    <CountryMap v-else :country="countryDetails" class="mb-8" />
+    <ErrorMessage v-if="countriesError" :message="countriesError" />
+
+    <ErrorMessage v-if="countryDetailsError" :message="countryDetailsError" />
+
+    <CountryMap v-if="countryDetails" :country="countryDetails" class="mb-8" />
 
     <div class="mb-6">
       <label
@@ -30,73 +30,59 @@
       <div class="loader"></div>
     </div>
 
-    <template v-else>
-      <div v-if="countryDetails" class="mb-8">
+    <template v-else-if="countryDetails">
+      <div class="mb-8">
         <WeatherForecast
-          :forecast="weatherForecast"
-          :loading="false"
-          :error="weatherError"
+          :country="countryDetails"
           :locationName="countryDetails.name.common" />
       </div>
 
-      <div v-if="countryDetails" class="mb-8">
+      <div class="mb-8">
         <LocalTimeDisplay :country="countryDetails" />
       </div>
 
       <div class="flex flex-col md:flex-row gap-6">
         <div class="flex-1">
-          <ErrorMessage
-            v-if="countryDetailsError"
-            :message="countryDetailsError" />
-          <CountryDetails
-            v-else-if="countryDetails"
-            :country="countryDetails" />
+          <CountryDetails ref="countryDetailsRef" :country="countryDetails" />
 
-          <div v-if="countryDetails" class="mb-8">
+          <div class="mb-8">
             <PhotoGallery :country="countryDetails" />
           </div>
         </div>
 
         <div class="w-full md:w-1/4">
-          <ErrorMessage v-if="newsError" :message="newsError" />
           <NewsList
-            v-else-if="newsArticles.length"
-            :articles="newsArticles"
-            :countryName="countryDetails?.name.common || ''" />
-          <div
-            v-else-if="countryDetails"
-            class="bg-gray-100 p-4 rounded shadow-md">
-            <p>No news articles found for {{ countryDetails.name.common }}</p>
-          </div>
+            :country="countryDetails"
+            :countryName="countryDetails.name.common" />
         </div>
       </div>
     </template>
+
+    <ScrollToTop />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, nextTick } from "vue";
 import { useFetch } from "@/utils/useFetch";
-import CountryDetails from "@/components/CountryDetails.vue";
-import NewsList from "@/components/NewsList.vue";
+import CountryDetails from "@/components/country/CountryDetails.vue";
+import NewsList from "@/components/news/NewsList.vue";
 import Select from "@/components/Select.vue";
 import CountryMap from "@/components/CountryMap.vue";
-import WeatherForecast from "@/components/WeatherForecast.vue";
+import WeatherForecast from "@/components/weather/WeatherForecast.vue";
 import LocalTimeDisplay from "@/components/LocalTimeDisplay.vue";
-import PhotoGallery from "@/components/PhotoGallery.vue";
-import type { Country, GuardianResponse, GuardianArticle } from "@/types";
+import PhotoGallery from "@/components/photos/PhotoGallery.vue";
+import ScrollToTop from "@/components/ScrollToTop.vue";
+import type { Country } from "@/types";
 import ErrorMessage from "@/components/ErrorMessage.vue";
+import Banner from "@/components/Banner.vue";
 
 const isLoading = ref<boolean>(false);
+const countryDetailsRef = ref<InstanceType<typeof CountryDetails> | null>(null);
 
 const countries = ref<Country[]>([]);
 const selectedCountry = ref<string>("");
 const countryDetails = ref<Country | null>(null);
-const newsArticles = ref<GuardianArticle[]>([]);
-const lastNewsUrl = ref<string | null>(null);
-
-const weatherForecast = ref<any>(null);
-const weatherError = ref<string | null>(null);
 
 const {
   data: countriesData,
@@ -111,21 +97,10 @@ const {
   fetchData: fetchCountryDetails,
 } = useFetch<Country | null>(null);
 
-const {
-  data: newsData,
-  loading: newsLoading,
-  error: newsError,
-  fetchData: fetchNews,
-} = useFetch<GuardianResponse>(null);
-
 watch(
   countriesLoading,
   (loading) => {
-    if (loading) {
-      isLoading.value = true;
-    } else {
-      isLoading.value = false;
-    }
+    isLoading.value = loading;
   },
   { immediate: true }
 );
@@ -137,76 +112,29 @@ const countryOptions = computed(() =>
   }))
 );
 
-const fetchWeatherData = async (country: Country) => {
-  if (!country.latlng || country.latlng.length < 2) {
-    weatherError.value = "Location coordinates not available for this country";
-    weatherForecast.value = null;
-    return;
-  }
-
-  weatherError.value = null;
-
-  try {
-    const today = new Date();
-    const sevenDaysLater = new Date();
-    sevenDaysLater.setDate(today.getDate() + 6);
-
-    const formatDate = (date: Date) => {
-      return date.toISOString().split("T")[0];
-    };
-
-    let latitude = country.latlng[0];
-    let longitude = country.latlng[1];
-
-    if (country.capitalInfo?.latlng?.length === 2) {
-      latitude = country.capitalInfo.latlng[0];
-      longitude = country.capitalInfo.latlng[1];
-    }
-
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&start_date=${formatDate(
-      today
-    )}&end_date=${formatDate(sevenDaysLater)}`;
-
-    const response = await fetch(weatherUrl);
-
-    if (!response.ok) {
-      throw new Error(response.status + ": " + response.statusText);
-    }
-
-    const data = await response.json();
-    weatherForecast.value = data;
-  } catch (error) {
-    weatherError.value = `Failed to fetch weather data: ${
-      error instanceof Error ? error.message : "Unknown error"
-    }`;
-    weatherForecast.value = null;
-  }
+const scrollToCountryDetails = () => {
+  nextTick(() => {
+    setTimeout(() => {
+      if (countryDetailsRef.value?.$el) {
+        countryDetailsRef.value.$el.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
+    }, 100);
+  });
 };
 
 const handleCountrySelect = async (countryCode: string) => {
   selectedCountry.value = countryCode;
+  countryDetails.value = null;
 
-  weatherForecast.value = null;
-  weatherError.value = null;
-  newsArticles.value = [];
-
-  const countryUrl = `https://restcountries.com/v3.1/alpha/${selectedCountry.value}`;
+  const countryUrl = `https://restcountries.com/v3.1/alpha/${countryCode}`;
   await fetchCountryDetails(countryUrl);
 
   if (countryDetailsData.value && Array.isArray(countryDetailsData.value)) {
     countryDetails.value = countryDetailsData.value[0];
-
-    await fetchWeatherData(countryDetails.value as Country);
-
-    const countryName = encodeURIComponent(
-      countryDetails.value?.name.common || ""
-    );
-    const guardianApiUrl = `https://content.guardianapis.com/search?q=${countryName}&page-size=10&show-fields=thumbnail,headline,trailText&api-key=${
-      import.meta.env.VITE_GUARDIAN_API_KEY
-    }`;
-
-    lastNewsUrl.value = guardianApiUrl;
-    await fetchNews(guardianApiUrl);
+    scrollToCountryDetails();
   }
 };
 
@@ -214,17 +142,6 @@ watch(
   () => countriesData.value,
   (newData) => {
     if (newData) countries.value = newData;
-  }
-);
-
-watch(
-  () => newsData.value,
-  (newData) => {
-    if (newData?.response?.results) {
-      newsArticles.value = newData.response.results;
-    } else {
-      newsArticles.value = [];
-    }
   }
 );
 </script>

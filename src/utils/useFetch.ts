@@ -1,48 +1,36 @@
-import { ref, watchEffect } from "vue";
+import { ref } from "vue";
 
-export const useFetch = <T>(
-  initialUrl: string | null,
-  options?: RequestInit
-) => {
+export const useFetch = <T>(initialUrl: string | null) => {
   const data = ref<T | null>(null);
-  const loading = ref(false);
+  const loading = ref<boolean>(false);
   const error = ref<string | null>(null);
 
-  const abortController = new AbortController();
-
-  const fetchData = async (url: string | null = initialUrl) => {
-    if (!url) return;
+  const fetchData = async (url: string, options?: RequestInit) => {
     loading.value = true;
     error.value = null;
+    data.value = null;
 
     try {
-      const response = await fetch(url, {
-        ...options,
-        signal: abortController.signal,
-      });
+      const response = await fetch(url, options);
+
       if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
+        throw new Error(`${response.status}: ${response.statusText}`);
       }
-      const result: T = await response.json();
-      data.value = result;
+
+      const jsonData = await response.json();
+      data.value = jsonData;
+      return jsonData;
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        console.log("Fetch aborted");
-      } else {
-        error.value = (err as Error).message;
-      }
+      error.value = err instanceof Error ? err.message : String(err);
+      return null;
     } finally {
       loading.value = false;
     }
   };
 
-  watchEffect(() => {
-    if (initialUrl) fetchData(initialUrl);
-  });
+  if (initialUrl) {
+    fetchData(initialUrl);
+  }
 
-  const abort = () => {
-    abortController.abort();
-  };
-
-  return { data, loading, error, fetchData, abort };
+  return { data, loading, error, fetchData };
 };

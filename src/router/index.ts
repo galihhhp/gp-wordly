@@ -6,7 +6,7 @@ const routes = [
     path: '/',
     name: 'home',
     component: HomeView,
-    meta: { title: 'Home' },
+    meta: { title: 'GP Wordly' },
   },
 ]
 

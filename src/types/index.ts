@@ -46,3 +46,39 @@ export interface GuardianResponse {
     pages: number;
   };
 }
+
+export interface UnsplashPhoto {
+  id: string;
+  description: string | null;
+  alt_description: string | null;
+  urls: {
+    raw: string;
+    full: string;
+    regular: string;
+    small: string;
+    thumb: string;
+  };
+  links: {
+    self: string;
+    html: string;
+    download: string;
+    download_location: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    username: string;
+    bio?: string;
+    profile_image?: {
+      small: string;
+      medium: string;
+      large: string;
+    };
+    links: {
+      self: string;
+      html: string;
+      photos: string;
+      likes: string;
+    };
+  };
+}
