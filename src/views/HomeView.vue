@@ -17,13 +17,8 @@
       <Select
         :options="countryOptions"
         placeholder="Select a country"
-        @update:modelValue="
-          async (value) => {
-            isLoading = true;
-            await handleCountrySelect(value as string);
-            isLoading = false;
-          }
-        " />
+        v-model="selectedCountry"
+        @update:modelValue="handleCountrySelect" />
     </div>
 
     <div v-if="isLoading" class="flex justify-center py-12">
@@ -63,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, nextTick } from "vue";
+import { ref, watch, computed, nextTick, onMounted } from "vue";
 import { useFetch } from "@/utils/useFetch";
 import CountryDetails from "@/components/country/CountryDetails.vue";
 import NewsList from "@/components/news/NewsList.vue";
@@ -125,9 +120,20 @@ const scrollToCountryDetails = () => {
   });
 };
 
-const handleCountrySelect = async (countryCode: string) => {
+const updateUrlParams = (countryCode: string) => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("country", countryCode);
+  window.history.replaceState({}, "", url.toString());
+};
+
+const handleCountrySelect = async (countryCode: string | number) => {
+  if (!countryCode || typeof countryCode !== "string") return;
+
+  isLoading.value = true;
   selectedCountry.value = countryCode;
   countryDetails.value = null;
+
+  updateUrlParams(countryCode);
 
   const countryUrl = `https://restcountries.com/v3.1/alpha/${countryCode}`;
   await fetchCountryDetails(countryUrl);
@@ -136,14 +142,37 @@ const handleCountrySelect = async (countryCode: string) => {
     countryDetails.value = countryDetailsData.value[0];
     scrollToCountryDetails();
   }
+
+  isLoading.value = false;
+};
+
+const loadCountryFromUrl = async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const countryParam = urlParams.get("country");
+
+  if (countryParam && countries.value.length > 0) {
+    const countryExists = countries.value.some((c) => c.cca3 === countryParam);
+    if (countryExists) {
+      await handleCountrySelect(countryParam);
+    }
+  }
 };
 
 watch(
   () => countriesData.value,
-  (newData) => {
-    if (newData) countries.value = newData;
+  async (newData) => {
+    if (newData) {
+      countries.value = newData;
+      await loadCountryFromUrl();
+    }
   }
 );
+
+onMounted(() => {
+  window.addEventListener("popstate", async () => {
+    await loadCountryFromUrl();
+  });
+});
 </script>
 
 <style scoped>

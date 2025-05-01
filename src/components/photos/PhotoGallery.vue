@@ -1,11 +1,11 @@
 <template>
   <div class="bg-white rounded-xl border-2 p-4 my-4 overflow-hidden">
-    <h2 class="text-xl font-bold mb-6 flex items-center justify-between">
+    <div class="text-xl font-bold mb-6 flex items-center justify-between">
       <h3 class="text-2xl font-bold text-gray-800">
         Explore {{ countryName }}
       </h3>
       <div v-if="loading" class="loader"></div>
-    </h2>
+    </div>
 
     <ErrorMessage v-if="error" :message="error" />
 

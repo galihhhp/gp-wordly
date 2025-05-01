@@ -71,7 +71,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  nextTick,
+  watch,
+} from "vue";
 
 interface Option {
   value: string | number;
@@ -86,6 +93,10 @@ const props = defineProps({
   placeholder: {
     type: String,
     default: "Select an option",
+  },
+  modelValue: {
+    type: [String, Number],
+    default: null,
   },
 });
 
@@ -141,6 +152,36 @@ const handleClickOutside = (event: MouseEvent) => {
   }
 };
 
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    if (newValue !== undefined && newValue !== null) {
+      const option = props.options.find((opt) => opt.value === newValue);
+      if (option) {
+        selectedOption.value = option;
+      }
+    } else {
+      selectedOption.value = null;
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.options,
+  () => {
+    if (props.modelValue !== undefined && props.modelValue !== null) {
+      const option = props.options.find(
+        (opt) => opt.value === props.modelValue
+      );
+      if (option) {
+        selectedOption.value = option;
+      }
+    }
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
 });
@@ -152,7 +193,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .custom-scrollbar {
-  /* For Webkit browsers like Chrome/Safari */
   &::-webkit-scrollbar {
     width: 8px;
   }
@@ -171,7 +211,6 @@ onBeforeUnmount(() => {
     background: #a0a0a0;
   }
 
-  /* For Firefox */
   scrollbar-width: thin;
   scrollbar-color: #c1c1c1 #f1f1f1;
 }
